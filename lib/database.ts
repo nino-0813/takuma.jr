@@ -442,6 +442,32 @@ export const chatRooms = {
   },
 };
 
+const CHAT_FILES_BUCKET = 'chat-files';
+
+/** チャット用ファイルの公開URLから Storage のパスを抽出して削除。自前ドメインの URL の場合のみ削除する。 */
+export async function deleteChatFileByUrl(url: string): Promise<void> {
+  try {
+    const match = url.match(/\/storage\/v1\/object\/public\/chat-files\/(.+)$/);
+    if (match?.[1]) await supabase.storage.from(CHAT_FILES_BUCKET).remove([decodeURIComponent(match[1])]);
+  } catch {
+    // ignore
+  }
+}
+
+/** チャット用ファイル（画像・PDF等）を Storage にアップロード。公開URLを返す。バケット "chat-files" を Dashboard で Public 作成すること。 */
+export async function uploadChatFile(roomId: string, userId: string, file: File): Promise<{ url: string; error: Error | null }> {
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+  const path = `${roomId}/${userId}/${crypto.randomUUID()}_${safeName}`;
+  const { error } = await supabase.storage.from(CHAT_FILES_BUCKET).upload(path, file, {
+    contentType: file.type || undefined,
+    upsert: false,
+  });
+  if (error) return { url: '', error };
+  const { data: { publicUrl } } = supabase.storage.from(CHAT_FILES_BUCKET).getPublicUrl(path);
+  return { url: publicUrl, error: null };
+}
+
 export const chatMessages = {
   async list(roomId: string) {
     const { data: rows, error } = await supabase
@@ -470,6 +496,12 @@ export const chatMessages = {
       .select()
       .single();
     return { data, error };
+  },
+
+  /** 自分のメッセージを削除（RLS で本人のみ削除可） */
+  async delete(messageId: string) {
+    const { error } = await supabase.from('chat_messages').delete().eq('id', messageId);
+    return { error };
   },
 
   /** ルームを開いたときに、自分以外のメッセージを既読にする */

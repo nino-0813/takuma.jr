@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, MessageCircle, ChevronLeft, Send, X, Trash2, LayoutGrid, GraduationCap, Users, Settings } from 'lucide-react';
+import { Search, Plus, MessageCircle, ChevronLeft, Send, X, Trash2, LayoutGrid, GraduationCap, Users, Settings, FileText } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
-import { profiles, chatRooms, chatMessages } from '../../lib/database';
+import { profiles, chatRooms, chatMessages, uploadChatFile, deleteChatFileByUrl } from '../../lib/database';
+import { imageFileToWebp } from '../../lib/imageToWebp';
 
 interface ChatRoom {
   id: string;
@@ -20,6 +21,24 @@ interface Message {
   time: string;
   isMe: boolean;
   readCount?: number;
+}
+
+/** 添付メッセージの content が JSON の場合の型 */
+interface ChatAttachment {
+  t: 'img' | 'file';
+  u: string;
+  n?: string;
+}
+
+function parseAttachment(content: string): ChatAttachment | null {
+  if (!content || !content.trim().startsWith('{')) return null;
+  try {
+    const o = JSON.parse(content) as unknown;
+    if (o && typeof o === 'object' && 'u' in o && typeof (o as ChatAttachment).u === 'string') return o as ChatAttachment;
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
 const FALLBACK_ROOMS: ChatRoom[] = [
@@ -59,6 +78,9 @@ export const SoccerChat: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [roomsFromApi, setRoomsFromApi] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const categories = ['すべて', '学年別', '保護者会', '運営', '連絡'] as const;
   const categoryIcons: Record<typeof categories[number], React.ReactNode> = {
@@ -190,6 +212,53 @@ export const SoccerChat: React.FC = () => {
     ]);
   };
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    let file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !openChat || !userId) return;
+    if ((file.type || '').startsWith('image/')) {
+      try {
+        file = await imageFileToWebp(file);
+      } catch {
+        return;
+      }
+    }
+    setUploadingFile(true);
+    const { url, error } = await uploadChatFile(openChat.id, userId, file);
+    setUploadingFile(false);
+    if (error || !url) return;
+    const isImage = (file.type || '').startsWith('image/');
+    const payload: ChatAttachment = { t: isImage ? 'img' : 'file', u: url, n: file.name };
+    const content = JSON.stringify(payload);
+    const { error: sendError } = await chatMessages.send(openChat.id, userId, content);
+    if (sendError) return;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `local-${Date.now()}`,
+        sender: displayName || '自分',
+        content,
+        time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+        isMe: true,
+      },
+    ]);
+  };
+
+  const deleteMessage = async (msg: Message) => {
+    if (!msg.isMe) return;
+    if (!confirm('このメッセージを削除しますか？')) return;
+    const att = parseAttachment(msg.content);
+    if (att?.u) await deleteChatFileByUrl(att.u);
+    if (msg.id.startsWith('local-')) {
+      setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+      return;
+    }
+    setDeletingMessageId(msg.id);
+    const { error } = await chatMessages.delete(msg.id);
+    setDeletingMessageId(null);
+    if (!error) setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+  };
+
   const deleteRoom = async (room: ChatRoom) => {
     if (!roomsFromApi) return;
     if (!confirm(`「${room.name}」を削除しますか？\nルーム内のメッセージもすべて削除されます。`)) return;
@@ -288,12 +357,42 @@ export const SoccerChat: React.FC = () => {
                               : 'bg-white text-slate-800 rounded-[18px_18px_18px_4px]'
                           }`}
                         >
-                          {msg.content}
+                          {(() => {
+                            const att = parseAttachment(msg.content);
+                            if (att?.t === 'img') {
+                              return (
+                                <a href={att.u} target="_blank" rel="noopener noreferrer" className="block">
+                                  <img src={att.u} alt={att.n || '画像'} className="max-w-full max-h-64 rounded-lg object-contain" />
+                                </a>
+                              );
+                            }
+                            if (att?.t === 'file') {
+                              return (
+                                <a href={att.u} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-emerald-700 underline font-medium">
+                                  <FileText size={18} />
+                                  {att.n || 'ファイル'}
+                                </a>
+                              );
+                            }
+                            return <>{msg.content}</>;
+                          })()}
                         </div>
                         <div className={`flex items-center gap-1.5 mt-0.5 px-1 ${msg.isMe ? 'justify-end' : 'justify-start'}`}>
                           <span className="text-[10px] text-slate-500">{msg.time}</span>
                           {msg.isMe && (msg.readCount ?? 0) > 0 && (
                             <span className="text-[10px] text-slate-400">既読 {msg.readCount}</span>
+                          )}
+                          {msg.isMe && (
+                            <button
+                              type="button"
+                              onClick={() => deleteMessage(msg)}
+                              disabled={deletingMessageId === msg.id}
+                              className="p-1 rounded text-slate-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                              aria-label="メッセージを削除"
+                              title="削除"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           )}
                         </div>
                       </div>
@@ -306,7 +405,24 @@ export const SoccerChat: React.FC = () => {
         )}
 
         <div className="fixed bottom-20 left-0 right-0 max-w-md mx-auto px-3 py-2 bg-[#a0b8cc] z-[60]">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
           <div className="flex items-end gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sending || uploadingFile}
+              className="shrink-0 w-10 h-10 rounded-full bg-white/90 text-slate-600 flex items-center justify-center active:scale-95 transition-transform disabled:opacity-50 disabled:pointer-events-none border border-slate-200 shadow-sm"
+              aria-label="画像・ファイルを添付"
+              title="画像・PDF・ファイルを添付"
+            >
+              <Plus size={22} strokeWidth={2.5} />
+            </button>
             <input
               type="text"
               value={newMessage}

@@ -146,6 +146,10 @@ create policy "Authenticated can view all match videos" on storage.objects for s
 create policy "Users can update own match videos" on storage.objects for update to authenticated using (bucket_id = 'match-videos' and (storage.foldername(name))[1] = (auth.uid())::text);
 create policy "Users can delete own match videos" on storage.objects for delete to authenticated using (bucket_id = 'match-videos' and (storage.foldername(name))[1] = (auth.uid())::text);
 
+-- Storage: バケット "chat-files" を Dashboard で作成し Public にすると、チャットの画像・PDF等の添付が利用可能になります
+create policy "Authenticated can upload chat files" on storage.objects for insert to authenticated with check (bucket_id = 'chat-files');
+create policy "Authenticated can view chat files" on storage.objects for select to authenticated using (bucket_id = 'chat-files');
+
 -- 7. Chat Rooms (チームチャットのルーム)
 create table if not exists public.chat_rooms (
   id uuid default gen_random_uuid() primary key,
