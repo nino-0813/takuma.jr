@@ -1,0 +1,7 @@
+{
+  "name": "Soccer Club Manager & Academy",
+  "description": "A comprehensive soccer club management and skill-building app for junior players and teams, featuring schedule management, video lessons, practice recording, and team communication.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
