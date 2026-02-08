@@ -376,10 +376,16 @@ export const SoccerSchedule: React.FC<SoccerScheduleProps> = ({ triggerOpenAddEv
         </div>
       )}
 
-      {/* Add Event Modal */}
+      {/* Add Event Modal - スマホで背面タップで閉じられるよう backdrop を独立 */}
       {showAddEvent && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/50" onClick={() => setShowAddEvent(false)}>
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-sm p-6 pb-10 sm:pb-6 space-y-5 relative max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50 cursor-pointer touch-manipulation"
+            onClick={() => setShowAddEvent(false)}
+            aria-label="閉じる"
+          />
+          <div className="relative z-10 bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-sm p-6 pb-10 sm:pb-6 space-y-5 max-h-[85vh] sm:max-h-[90vh] overflow-y-auto overscroll-contain">
             <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto sm:hidden" />
             <div className="flex items-center justify-between">
               <div>

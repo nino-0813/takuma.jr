@@ -16,6 +16,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [showPracticeRecord, setShowPracticeRecord] = useState(false);
   const [scheduleOpenAddEvent, setScheduleOpenAddEvent] = useState(false);
+  const [chatRoomOpen, setChatRoomOpen] = useState(false);
 
   const handleNavigateTab = (tab: Tab) => {
     setActiveTab(tab);
@@ -39,7 +40,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onLogout }) => {
           />
         );
       case 'schedule': return <SoccerSchedule triggerOpenAddEvent={scheduleOpenAddEvent} onTriggerOpenAddEvent={() => setScheduleOpenAddEvent(false)} />;
-      case 'chat': return <SoccerChat />;
+      case 'chat': return <SoccerChat onChatRoomOpenChange={setChatRoomOpen} />;
       case 'academy': return <SoccerAcademy />;
       case 'mypage': return <SoccerMyPage onLogout={handleLogout} />;
       default: return null;
@@ -52,7 +53,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onLogout }) => {
 
   return (
     <div className="flex-1 flex flex-col bg-slate-50 relative overflow-hidden h-screen">
-      <div className="flex-1 overflow-y-auto hide-scrollbar relative z-0" style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}>
+      <div
+        className="flex-1 overflow-y-auto overflow-x-hidden hide-scrollbar relative z-0"
+        style={{
+          paddingBottom: activeTab === 'chat' && chatRoomOpen ? 0 : 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
         {renderContent()}
       </div>
 
@@ -67,7 +74,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onLogout }) => {
         </button>
       )}
 
-      {/* Navigation - safe-areaでスマホのホームインジケーターを避ける */}
+      {/* Navigation - チャットルームを開いているときは非表示。safe-areaでスマホのホームインジケーターを避ける */}
+      {!(activeTab === 'chat' && chatRoomOpen) && (
       <div
         className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/80 backdrop-blur-md border-t border-slate-100 px-4 py-3 flex justify-between items-center z-50"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
@@ -103,6 +111,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onLogout }) => {
           onClick={() => setActiveTab('mypage')}
         />
       </div>
+      )}
     </div>
   );
 };

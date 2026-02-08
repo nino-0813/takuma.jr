@@ -60,7 +60,11 @@ function formatMessageTime(iso: string): string {
   return d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
 }
 
-export const SoccerChat: React.FC = () => {
+interface SoccerChatProps {
+  onChatRoomOpenChange?: (open: boolean) => void;
+}
+
+export const SoccerChat: React.FC<SoccerChatProps> = ({ onChatRoomOpenChange }) => {
   const { user } = useAuth();
   const [displayName, setDisplayName] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -161,6 +165,10 @@ export const SoccerChat: React.FC = () => {
     },
     [userId]
   );
+
+  useEffect(() => {
+    onChatRoomOpenChange?.(!!openChat);
+  }, [openChat, onChatRoomOpenChange]);
 
   useEffect(() => {
     if (!openChat) return;
