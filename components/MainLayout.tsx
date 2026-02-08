@@ -16,7 +16,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [showPracticeRecord, setShowPracticeRecord] = useState(false);
   const [scheduleOpenAddEvent, setScheduleOpenAddEvent] = useState(false);
+  const [scheduleAddEventOpen, setScheduleAddEventOpen] = useState(false);
   const [chatRoomOpen, setChatRoomOpen] = useState(false);
+
+  /** フル画面の追加・編集などでナビを隠すか */
+  const hideBottomNav = (activeTab === 'chat' && chatRoomOpen) || (activeTab === 'schedule' && scheduleAddEventOpen);
 
   const handleNavigateTab = (tab: Tab) => {
     setActiveTab(tab);
@@ -39,7 +43,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onLogout }) => {
             onNavigateTab={handleNavigateTab}
           />
         );
-      case 'schedule': return <SoccerSchedule triggerOpenAddEvent={scheduleOpenAddEvent} onTriggerOpenAddEvent={() => setScheduleOpenAddEvent(false)} />;
+      case 'schedule': return <SoccerSchedule triggerOpenAddEvent={scheduleOpenAddEvent} onTriggerOpenAddEvent={() => setScheduleOpenAddEvent(false)} onAddEventOpenChange={setScheduleAddEventOpen} />;
       case 'chat': return <SoccerChat onChatRoomOpenChange={setChatRoomOpen} />;
       case 'academy': return <SoccerAcademy />;
       case 'mypage': return <SoccerMyPage onLogout={handleLogout} />;
@@ -56,15 +60,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onLogout }) => {
       <div
         className="flex-1 overflow-y-auto overflow-x-hidden hide-scrollbar relative z-0"
         style={{
-          paddingBottom: activeTab === 'chat' && chatRoomOpen ? 0 : 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))',
+          paddingBottom: hideBottomNav ? 0 : 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))',
           WebkitOverflowScrolling: 'touch',
         }}
       >
         {renderContent()}
       </div>
 
-      {/* Floating Action Button - 予定を追加 */}
-      {activeTab === 'schedule' && (
+      {/* Floating Action Button - 予定を追加（追加画面を開いているときは非表示） */}
+      {activeTab === 'schedule' && !scheduleAddEventOpen && (
         <button
           onClick={() => setScheduleOpenAddEvent(true)}
           className="absolute bottom-28 right-6 w-14 h-14 bg-emerald-500 rounded-full shadow-lg shadow-emerald-200 flex items-center justify-center text-white active:scale-95 transition-transform z-10"
@@ -74,11 +78,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onLogout }) => {
         </button>
       )}
 
-      {/* Navigation - チャットルームを開いているときは非表示。safe-areaでスマホのホームインジケーターを避ける */}
-      {!(activeTab === 'chat' && chatRoomOpen) && (
+      {/* Navigation - チャットルーム・予定追加などフル画面のときは非表示。safe-areaでスマホのホームインジケーターを避ける */}
+      {!hideBottomNav && (
       <div
-        className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/80 backdrop-blur-md border-t border-slate-100 px-4 py-3 flex justify-between items-center z-50"
-        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+        className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/90 backdrop-blur-md border-t border-slate-100 shadow-[0_-2px_10px_rgba(0,0,0,0.06)] px-3 py-2 sm:px-4 sm:py-3 flex justify-between items-center z-50"
+        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
       >
         <NavItem
           icon={<Home size={22} />}

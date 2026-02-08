@@ -8,9 +8,10 @@ import type { ScheduleEvent } from '../../lib/scheduleEvents';
 interface SoccerScheduleProps {
   triggerOpenAddEvent?: boolean;
   onTriggerOpenAddEvent?: () => void;
+  onAddEventOpenChange?: (open: boolean) => void;
 }
 
-export const SoccerSchedule: React.FC<SoccerScheduleProps> = ({ triggerOpenAddEvent, onTriggerOpenAddEvent }) => {
+export const SoccerSchedule: React.FC<SoccerScheduleProps> = ({ triggerOpenAddEvent, onTriggerOpenAddEvent, onAddEventOpenChange }) => {
   const { user } = useAuth();
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -61,6 +62,10 @@ export const SoccerSchedule: React.FC<SoccerScheduleProps> = ({ triggerOpenAddEv
       onTriggerOpenAddEvent?.();
     }
   }, [triggerOpenAddEvent, onTriggerOpenAddEvent]);
+
+  useEffect(() => {
+    onAddEventOpenChange?.(showAddEvent);
+  }, [showAddEvent, onAddEventOpenChange]);
 
   useEffect(() => {
     if (user) {
