@@ -312,6 +312,13 @@ export const SoccerSchedule: React.FC<SoccerScheduleProps> = ({ triggerOpenAddEv
                 )}
                 <div className="p-5 space-y-4">
                   <div className="flex items-start space-x-3">
+                    <div className="mt-1 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><CalIcon size={16} /></div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">{event.title || '予定'}</p>
+                      <p className="text-[10px] text-slate-400 font-medium">{getTypeBadge(event.type).label}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
                     <div className="mt-1 p-1.5 bg-slate-50 text-slate-400 rounded-lg"><Clock size={16} /></div>
                     <div>
                       <p className="text-sm font-bold text-slate-800">{event.time}</p>
@@ -432,12 +439,20 @@ export const SoccerSchedule: React.FC<SoccerScheduleProps> = ({ triggerOpenAddEv
                 ))}
               </div>
             </div>
-            <div className="rounded-2xl overflow-hidden border border-slate-100 aspect-video bg-slate-900">
+            <div className="rounded-2xl overflow-hidden border border-slate-100 aspect-video bg-slate-900 relative">
               <img
                 src={newEvent.type === 'match' ? '/images/2.webp' : '/images/1.webp'}
                 alt={newEvent.type === 'match' ? '試合' : '練習'}
                 className="w-full h-full object-cover"
               />
+              <div className="absolute inset-0 flex flex-col justify-end p-4 bg-gradient-to-t from-black/70 via-transparent to-transparent">
+                <span className="text-[10px] font-bold text-white/90 uppercase tracking-wider">
+                  {EVENT_TYPE_OPTIONS.find((o) => o.value === newEvent.type)?.label ?? '練習'}
+                </span>
+                <span className="text-white font-bold text-sm mt-0.5 truncate">
+                  {newEvent.title.trim() || 'タイトルを入力'}
+                </span>
+              </div>
             </div>
             <div>
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2">タイトル</label>
