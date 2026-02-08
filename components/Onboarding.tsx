@@ -18,7 +18,7 @@ const SLIDES = [
       { emoji: '✅', label: '出欠管理' },
     ],
     bg: 'from-emerald-500 to-teal-600',
-    image: 'https://picsum.photos/seed/soccer-team/400/300',
+    image: '/images/app-icon.jpeg',
   },
   {
     icon: '📝',
@@ -31,7 +31,7 @@ const SLIDES = [
       { emoji: '🏅', label: 'スタンプ' },
     ],
     bg: 'from-blue-500 to-indigo-600',
-    image: 'https://picsum.photos/seed/soccer-kid/400/300',
+    image: '/images/app-icon.jpeg',
   },
   {
     icon: '🎓',
@@ -44,7 +44,7 @@ const SLIDES = [
       { emoji: '🏆', label: 'チャレンジ' },
     ],
     bg: 'from-orange-500 to-red-500',
-    image: 'https://picsum.photos/seed/soccer-dribble/400/300',
+    image: '/images/app-icon.jpeg',
   },
 ];
 
