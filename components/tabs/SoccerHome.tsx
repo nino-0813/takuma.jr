@@ -12,17 +12,32 @@ interface SoccerHomeProps {
   onNavigateTab?: (tab: Tab) => void;
 }
 
-const NOTIFICATIONS: Notification[] = [
-  { id: '1', title: '練習試合のお知らせ', message: '11/3(日) 中央スポーツパークで練習試合があります', time: '10分前', read: false, type: 'event' },
-  { id: '2', title: '【重要】集合場所変更', message: '雨天のため集合場所が体育館ロビーに変更されました', time: '1時間前', read: false, type: 'important' },
-  { id: '3', title: '新しい動画が追加されました', message: '「シザースフェイントのコツ」がアカデミーに追加', time: '昨日', read: true, type: 'info' },
-  { id: '4', title: 'スタンプ獲得！', message: '連続10日練習記録達成のスタンプを獲得しました', time: '2日前', read: true, type: 'info' },
-];
+const NOTIF_READ_KEY = 'soccer-home-notif-read';
+
+function formatNotifTime(date: Date): string {
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'たった今';
+  if (min < 60) return `${min}分前`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}時間前`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return '昨日';
+  if (d < 7) return `${d}日前`;
+  return date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
+}
 
 export const SoccerHome: React.FC<SoccerHomeProps> = ({ onStartPractice, onNavigateTab }) => {
   const { user } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState(NOTIFICATIONS);
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(NOTIF_READ_KEY) || '[]');
+    } catch {
+      return [];
+    }
+  });
   const [showDetail, setShowDetail] = useState(false);
   const [showAbsence, setShowAbsence] = useState(false);
   const [absenceReason, setAbsenceReason] = useState('');
@@ -60,7 +75,6 @@ export const SoccerHome: React.FC<SoccerHomeProps> = ({ onStartPractice, onNavig
   }, [user]);
 
   const userName = user?.user_metadata?.name || 'はると';
-  const unreadCount = notifications.filter(n => !n.read).length;
   const [scheduleEventsList, setScheduleEventsList] = useState<ScheduleEvent[]>([]);
   useEffect(() => {
     const now = new Date();
@@ -143,6 +157,47 @@ export const SoccerHome: React.FC<SoccerHomeProps> = ({ onStartPractice, onNavig
     return () => window.removeEventListener('focus', onFocus);
   }, [loadAttendance, loadLatestPracticeRecord, loadLatestMatchVideo, nextSchedule?.event.id]);
 
+  /** 予定・出欠・試合動画の実データから通知を生成し、既読は localStorage と連動 */
+  const notifications = useMemo((): Notification[] => {
+    const readSet = new Set(readNotificationIds);
+    const list: Notification[] = [];
+    const now = new Date();
+    if (nextSchedule?.event) {
+      const ev = nextSchedule.event;
+      list.push({
+        id: 'schedule-next',
+        title: `【予定】${nextSchedule.label} ${ev.title}`,
+        message: `${ev.time} ${ev.location}`,
+        time: nextSchedule.label,
+        read: readSet.has('schedule-next'),
+        type: 'event',
+      });
+      if (attendanceStatus[ev.id] === 'undecided') {
+        list.push({
+          id: `attendance-${ev.id}`,
+          title: '出欠の回答をお願いします',
+          message: `${ev.time} 〜 ${ev.title}`,
+          time: nextSchedule.label,
+          read: readSet.has(`attendance-${ev.id}`),
+          type: 'important',
+        });
+      }
+    }
+    if (latestMatchVideo) {
+      list.push({
+        id: `video-${latestMatchVideo.id}`,
+        title: '新しい試合動画が追加されました',
+        message: latestMatchVideo.title,
+        time: latestMatchVideo.match_date ? formatNotifTime(new Date(latestMatchVideo.match_date + 'T12:00:00')) : '近日',
+        read: readSet.has(`video-${latestMatchVideo.id}`),
+        type: 'info',
+      });
+    }
+    return list.sort((a, b) => (a.read === b.read ? 0 : a.read ? 1 : -1));
+  }, [nextSchedule, attendanceStatus, latestMatchVideo, readNotificationIds]);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
   const formatRecordDate = (dateStr: string) => {
     const today = new Date();
     const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
@@ -224,7 +279,16 @@ export const SoccerHome: React.FC<SoccerHomeProps> = ({ onStartPractice, onNavig
   }, [nextSchedule?.event?.id, nextSchedule?.event?.date, nextSchedule?.event?.month, nextSchedule?.event?.year]);
 
   const markAllRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
+    const ids = notifications.map(n => n.id);
+    setReadNotificationIds(prev => {
+      const next = [...new Set([...prev, ...ids])];
+      try {
+        localStorage.setItem(NOTIF_READ_KEY, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
   };
 
   const handleClockIn = async () => {
