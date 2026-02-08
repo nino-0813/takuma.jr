@@ -475,7 +475,7 @@ export const SoccerHome: React.FC<SoccerHomeProps> = ({ onStartPractice, onNavig
       {/* Learning - 最新の試合動画 */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-black text-slate-800 tracking-tight">おすすめの学習</h3>
+          <h3 className="font-black text-slate-800 tracking-tight">試合動画</h3>
           <button onClick={() => onNavigateTab?.('academy')} className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">試合動画</button>
         </div>
         {latestMatchVideo ? (
