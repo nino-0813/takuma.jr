@@ -376,24 +376,34 @@ export const SoccerSchedule: React.FC<SoccerScheduleProps> = ({ triggerOpenAddEv
         </div>
       )}
 
-      {/* Add Event Modal - スマホで背面タップで閉じられるよう backdrop を独立 */}
+      {/* Add Event - スマホはフルページ、PCはモーダル */}
       {showAddEvent && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
+        <div className="fixed inset-0 z-50 flex flex-col sm:flex-none sm:items-center sm:justify-center sm:p-6 bg-white sm:bg-transparent">
+          {/* PC: 背面タップで閉じる */}
           <button
             type="button"
-            className="absolute inset-0 bg-black/50 cursor-pointer touch-manipulation"
+            className="hidden sm:block absolute inset-0 bg-black/50 cursor-pointer touch-manipulation"
             onClick={() => setShowAddEvent(false)}
             aria-label="閉じる"
           />
-          <div className="relative z-10 bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-sm p-6 pb-10 sm:pb-6 space-y-5 max-h-[85vh] sm:max-h-[90vh] overflow-y-auto overscroll-contain">
-            <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto sm:hidden" />
-            <div className="flex items-center justify-between">
-              <div>
+          <div className="relative z-10 flex flex-col h-full w-full max-w-sm sm:max-h-[90vh] sm:rounded-3xl bg-white sm:mx-auto overflow-hidden">
+            {/* ヘッダー: スマホは戻る、PCは閉じる */}
+            <div className="flex items-center gap-3 p-4 pb-2 pt-[max(1rem,env(safe-area-inset-top))] sm:pt-4 flex-shrink-0 border-b border-slate-100 sm:border-0">
+              <button
+                type="button"
+                onClick={() => setShowAddEvent(false)}
+                className="sm:hidden p-2 -ml-1 rounded-full hover:bg-slate-100 text-slate-600"
+                aria-label="戻る"
+              >
+                <ChevronLeft size={24} />
+              </button>
+              <div className="flex-1 min-w-0">
                 <h3 className="text-lg font-black text-slate-800">予定を追加</h3>
                 <p className="text-xs text-slate-500 mt-0.5">{currentYear}年{currentMonth + 1}月{selectedDate}日</p>
               </div>
-              <button onClick={() => setShowAddEvent(false)} className="p-2 rounded-full hover:bg-slate-100 text-slate-400"><X size={20} /></button>
+              <button onClick={() => setShowAddEvent(false)} className="hidden sm:block p-2 rounded-full hover:bg-slate-100 text-slate-400"><X size={20} /></button>
             </div>
+            <div className="flex-1 overflow-y-auto overscroll-contain p-6 pt-4 pb-10 sm:pb-6 space-y-5">
             <div>
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2">タグ</label>
               <div className="flex gap-2">
@@ -447,6 +457,7 @@ export const SoccerSchedule: React.FC<SoccerScheduleProps> = ({ triggerOpenAddEv
               </div>
             </div>
             <button onClick={handleAddEvent} className="w-full py-3.5 bg-emerald-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-200 active:scale-[0.99] transition-transform">追加する</button>
+            </div>
           </div>
         </div>
       )}

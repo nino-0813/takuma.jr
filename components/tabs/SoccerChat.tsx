@@ -339,7 +339,7 @@ export const SoccerChat: React.FC<SoccerChatProps> = ({ onChatRoomOpenChange }) 
             <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto px-3 py-4 pb-36 min-h-0">
+          <div className="flex-1 overflow-y-auto px-3 py-4 min-h-0" style={{ paddingBottom: 'max(5rem, calc(4.5rem + env(safe-area-inset-bottom)))' }}>
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16">
                 <div className="w-16 h-16 rounded-full bg-white/60 flex items-center justify-center text-4xl mb-4">💬</div>
@@ -412,7 +412,7 @@ export const SoccerChat: React.FC<SoccerChatProps> = ({ onChatRoomOpenChange }) 
           </div>
         )}
 
-        <div className="fixed bottom-20 left-0 right-0 max-w-md mx-auto px-3 py-2 bg-[#a0b8cc] z-[60]">
+        <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto px-3 py-2 bg-[#a0b8cc] z-[60]" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
           <input
             ref={fileInputRef}
             type="file"
