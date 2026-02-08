@@ -15,6 +15,7 @@ interface PracticeRecord {
 
 interface SoccerMyPageProps {
   onLogout: () => void;
+  onProfileModalOpenChange?: (open: boolean) => void;
 }
 
 const MOOD_LABELS: Record<string, string> = {
@@ -25,7 +26,7 @@ const MOOD_LABELS: Record<string, string> = {
   tired: '😴 つかれた',
 };
 
-export const SoccerMyPage: React.FC<SoccerMyPageProps> = ({ onLogout }) => {
+export const SoccerMyPage: React.FC<SoccerMyPageProps> = ({ onLogout, onProfileModalOpenChange }) => {
   const { user } = useAuth();
   const [records, setRecords] = useState<PracticeRecord[]>([]);
   const [showRecordDetail, setShowRecordDetail] = useState<PracticeRecord | null>(null);
@@ -42,6 +43,10 @@ export const SoccerMyPage: React.FC<SoccerMyPageProps> = ({ onLogout }) => {
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: '', team: 'ジュニアA', position: 'MF', number: 10, course: 'ジュニアコース' });
   const [profileSaving, setProfileSaving] = useState(false);
+
+  useEffect(() => {
+    onProfileModalOpenChange?.(showProfileSettings);
+  }, [showProfileSettings, onProfileModalOpenChange]);
 
   useEffect(() => {
     if (user) {

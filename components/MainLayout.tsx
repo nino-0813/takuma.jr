@@ -18,9 +18,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onLogout }) => {
   const [scheduleOpenAddEvent, setScheduleOpenAddEvent] = useState(false);
   const [scheduleAddEventOpen, setScheduleAddEventOpen] = useState(false);
   const [chatRoomOpen, setChatRoomOpen] = useState(false);
+  const [mypageProfileModalOpen, setMypageProfileModalOpen] = useState(false);
 
-  /** フル画面の追加・編集などでナビを隠すか */
-  const hideBottomNav = (activeTab === 'chat' && chatRoomOpen) || (activeTab === 'schedule' && scheduleAddEventOpen);
+  /** フル画面の追加・編集・モーダルなどでナビを隠すか */
+  const hideBottomNav = (activeTab === 'chat' && chatRoomOpen) || (activeTab === 'schedule' && scheduleAddEventOpen) || (activeTab === 'mypage' && mypageProfileModalOpen);
 
   const handleNavigateTab = (tab: Tab) => {
     setActiveTab(tab);
@@ -46,7 +47,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onLogout }) => {
       case 'schedule': return <SoccerSchedule triggerOpenAddEvent={scheduleOpenAddEvent} onTriggerOpenAddEvent={() => setScheduleOpenAddEvent(false)} onAddEventOpenChange={setScheduleAddEventOpen} />;
       case 'chat': return <SoccerChat onChatRoomOpenChange={setChatRoomOpen} />;
       case 'academy': return <SoccerAcademy />;
-      case 'mypage': return <SoccerMyPage onLogout={handleLogout} />;
+      case 'mypage': return <SoccerMyPage onLogout={handleLogout} onProfileModalOpenChange={setMypageProfileModalOpen} />;
       default: return null;
     }
   };
