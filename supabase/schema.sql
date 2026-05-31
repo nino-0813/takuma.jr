@@ -119,9 +119,22 @@ create table if not exists public.chat_reads (
   primary key (team_id, member_id)
 );
 
+-- ---------- チャットのリアクション ----------
+create table if not exists public.message_reactions (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references public.teams(id) on delete cascade,
+  message_id uuid not null references public.messages(id) on delete cascade,
+  member_id uuid not null references public.members(id) on delete cascade,
+  emoji text not null,
+  created_at timestamptz not null default now(),
+  unique (message_id, member_id, emoji)
+);
+create index if not exists idx_reactions_message on public.message_reactions(message_id);
+
 -- リアルタイム配信（送信後すぐ全員に届く）を有効化
 alter publication supabase_realtime add table public.messages;
 alter publication supabase_realtime add table public.chat_reads;
+alter publication supabase_realtime add table public.message_reactions;
 
 -- ============================================================
 --  RLS（行レベルセキュリティ）
@@ -137,8 +150,9 @@ alter table public.duties          enable row level security;
 alter table public.announcements   enable row level security;
 alter table public.carpools        enable row level security;
 alter table public.carpool_riders  enable row level security;
-alter table public.messages        enable row level security;
-alter table public.chat_reads      enable row level security;
+alter table public.messages          enable row level security;
+alter table public.chat_reads        enable row level security;
+alter table public.message_reactions enable row level security;
 
 do $$
 declare
@@ -146,7 +160,8 @@ declare
 begin
   foreach t in array array[
     'teams','members','events','attendances','duties',
-    'announcements','carpools','carpool_riders','messages','chat_reads'
+    'announcements','carpools','carpool_riders','messages','chat_reads',
+    'message_reactions'
   ]
   loop
     execute format('drop policy if exists "anon_all_%1$s" on public.%1$I;', t);

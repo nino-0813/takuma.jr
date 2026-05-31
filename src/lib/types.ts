@@ -95,3 +95,12 @@ export interface ChatRead {
   member_id: string;
   last_read_at: string;
 }
+
+export interface MessageReaction {
+  id: string;
+  team_id: string;
+  message_id: string;
+  member_id: string;
+  emoji: string;
+  created_at: string;
+}

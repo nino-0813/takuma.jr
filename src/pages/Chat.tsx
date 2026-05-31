@@ -5,14 +5,17 @@ import { ChatIcon, SendIcon, TrashIcon } from "@/components/icons";
 import MemberSheet from "@/components/MemberSheet";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session";
-import type { ChatRead, Member, Message } from "@/lib/types";
+import type { ChatRead, Member, Message, MessageReaction } from "@/lib/types";
 import { cn, fmtDate } from "@/lib/utils";
+
+const REACTIONS = ["👍", "❤️", "⚽️", "😂", "🙏", "✅"];
 
 export default function Chat() {
   const { team, member } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
-  const [reads, setReads] = useState<Map<string, number>>(new Map()); // member_id -> last_read time(ms)
+  const [reads, setReads] = useState<Map<string, number>>(new Map());
+  const [reactions, setReactions] = useState<MessageReaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -20,13 +23,22 @@ export default function Chat() {
   const [actionMsg, setActionMsg] = useState<Message | null>(null);
   const [readInfoMsg, setReadInfoMsg] = useState<Message | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const pressTimer = useRef<number | undefined>(undefined);
 
   const memberMap = useMemo(() => {
     const m = new Map<string, Member>();
     members.forEach((x) => m.set(x.id, x));
     return m;
   }, [members]);
+
+  const reactionsByMessage = useMemo(() => {
+    const map = new Map<string, MessageReaction[]>();
+    for (const r of reactions) {
+      const arr = map.get(r.message_id) ?? [];
+      arr.push(r);
+      map.set(r.message_id, arr);
+    }
+    return map;
+  }, [reactions]);
 
   function scrollToBottom(smooth = false) {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
@@ -46,19 +58,22 @@ export default function Chat() {
     if (!team) return;
     let active = true;
     (async () => {
-      const [{ data: msgs }, { data: ms }, { data: rs }] = await Promise.all([
-        supabase
-          .from("messages")
-          .select("*")
-          .eq("team_id", team.id)
-          .order("created_at", { ascending: true })
-          .limit(300),
-        supabase.from("members").select("*").eq("team_id", team.id),
-        supabase.from("chat_reads").select("*").eq("team_id", team.id),
-      ]);
+      const [{ data: msgs }, { data: ms }, { data: rs }, { data: rx }] =
+        await Promise.all([
+          supabase
+            .from("messages")
+            .select("*")
+            .eq("team_id", team.id)
+            .order("created_at", { ascending: true })
+            .limit(300),
+          supabase.from("members").select("*").eq("team_id", team.id),
+          supabase.from("chat_reads").select("*").eq("team_id", team.id),
+          supabase.from("message_reactions").select("*").eq("team_id", team.id),
+        ]);
       if (!active) return;
       setMessages((msgs as Message[]) ?? []);
       setMembers((ms as Member[]) ?? []);
+      setReactions((rx as MessageReaction[]) ?? []);
       const map = new Map<string, number>();
       ((rs as ChatRead[]) ?? []).forEach((r) =>
         map.set(r.member_id, new Date(r.last_read_at).getTime())
@@ -73,7 +88,22 @@ export default function Chat() {
     };
   }, [team?.id, markRead]);
 
-  // リアルタイム購読（新着・既読・削除）
+  // リアクションのローカル更新（同じ人×同じ絵文字は1つに）
+  const upsertReaction = useCallback((r: MessageReaction) => {
+    setReactions((prev) => {
+      const filtered = prev.filter(
+        (x) =>
+          !(
+            x.message_id === r.message_id &&
+            x.member_id === r.member_id &&
+            x.emoji === r.emoji
+          )
+      );
+      return [...filtered, r];
+    });
+  }, []);
+
+  // リアルタイム購読
   useEffect(() => {
     if (!team) return;
     const channel = supabase
@@ -110,17 +140,29 @@ export default function Chat() {
           });
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "message_reactions", filter: `team_id=eq.${team.id}` },
+        (payload) => upsertReaction(payload.new as MessageReaction)
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "message_reactions" },
+        (payload) => {
+          const id = (payload.old as { id?: string })?.id;
+          if (id) setReactions((prev) => prev.filter((x) => x.id !== id));
+        }
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [team?.id, member?.id, markRead]);
+  }, [team?.id, member?.id, markRead, upsertReaction]);
 
   useEffect(() => {
     scrollToBottom(true);
   }, [messages.length]);
 
-  // あるメッセージを読んだ/未読のメンバー（投稿者は除く）
   function splitReaders(msg: Message) {
     const t = new Date(msg.created_at).getTime();
     const read: Member[] = [];
@@ -160,7 +202,7 @@ export default function Chat() {
 
   async function deleteMessage(m: Message) {
     setActionMsg(null);
-    setMessages((prev) => prev.filter((x) => x.id !== m.id)); // 楽観的
+    setMessages((prev) => prev.filter((x) => x.id !== m.id));
     await supabase.from("messages").delete().eq("id", m.id);
   }
 
@@ -169,23 +211,47 @@ export default function Chat() {
     try {
       await navigator.clipboard.writeText(m.body);
     } catch {
-      /* 失敗時は無視 */
+      /* 無視 */
     }
   }
 
-  // 長押し（モバイル）／右クリック（PC）でアクションを開く
-  function pressProps(m: Message) {
-    return {
-      onTouchStart: () => {
-        pressTimer.current = window.setTimeout(() => setActionMsg(m), 420);
-      },
-      onTouchEnd: () => clearTimeout(pressTimer.current),
-      onTouchMove: () => clearTimeout(pressTimer.current),
-      onContextMenu: (e: React.MouseEvent) => {
-        e.preventDefault();
-        setActionMsg(m);
-      },
-    };
+  async function toggleReaction(msg: Message, emoji: string) {
+    if (!team || !member) return;
+    setActionMsg(null);
+    const mine = reactions.find(
+      (r) =>
+        r.message_id === msg.id && r.member_id === member.id && r.emoji === emoji
+    );
+    if (mine) {
+      setReactions((prev) => prev.filter((x) => x !== mine));
+      await supabase
+        .from("message_reactions")
+        .delete()
+        .eq("message_id", msg.id)
+        .eq("member_id", member.id)
+        .eq("emoji", emoji);
+    } else {
+      const temp: MessageReaction = {
+        id: "temp-" + Date.now(),
+        team_id: team.id,
+        message_id: msg.id,
+        member_id: member.id,
+        emoji,
+        created_at: new Date().toISOString(),
+      };
+      upsertReaction(temp);
+      const { data } = await supabase
+        .from("message_reactions")
+        .insert({
+          team_id: team.id,
+          message_id: msg.id,
+          member_id: member.id,
+          emoji,
+        })
+        .select()
+        .single();
+      if (data) upsertReaction(data as MessageReaction);
+    }
   }
 
   const others = members.filter((m) => m.id !== member?.id).length;
@@ -194,7 +260,7 @@ export default function Chat() {
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/85 px-5 pb-3 pt-[calc(0.9rem+var(--safe-top))] backdrop-blur-xl">
         <h1 className="text-xl font-bold">チャット</h1>
-        <p className="text-xs text-slate-400">{team?.name}・みんなの連絡</p>
+        <p className="text-xs text-slate-400">{team?.name}・タップでリアクション</p>
       </header>
 
       <div className="flex-1 px-3 pb-[calc(8rem+var(--safe-bottom))] pt-3">
@@ -222,6 +288,7 @@ export default function Chat() {
               (i === messages.length - 1 ||
                 messages[i + 1]?.member_id !== m.member_id);
             const rc = mine ? splitReaders(m).read.length : 0;
+            const msgReactions = reactionsByMessage.get(m.id) ?? [];
             return (
               <div key={m.id}>
                 {newDay && (
@@ -249,7 +316,7 @@ export default function Chat() {
                   )}
                   <div
                     className={cn(
-                      "flex max-w-[72%] flex-col",
+                      "flex max-w-[75%] flex-col",
                       mine ? "items-end" : "items-start"
                     )}
                   >
@@ -275,23 +342,57 @@ export default function Chat() {
                           <span>{format(new Date(m.created_at), "HH:mm")}</span>
                         </div>
                       )}
-                      <div
-                        {...pressProps(m)}
+                      <button
+                        onClick={() => setActionMsg(m)}
                         className={cn(
-                          "no-callout cursor-pointer whitespace-pre-wrap break-words rounded-[1.15rem] px-3.5 py-2 text-[15px] leading-relaxed",
+                          "no-callout whitespace-pre-wrap break-words rounded-[1.15rem] px-3.5 py-2 text-left text-[15px] leading-relaxed",
                           mine
                             ? "rounded-br-md bg-pitch-600 text-white"
                             : "rounded-bl-md bg-white text-slate-800 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
                         )}
                       >
                         {m.body}
-                      </div>
+                      </button>
                       {!mine && (
                         <span className="mb-0.5 text-[10px] text-slate-400">
                           {format(new Date(m.created_at), "HH:mm")}
                         </span>
                       )}
                     </div>
+
+                    {/* リアクション表示 */}
+                    {msgReactions.length > 0 && (
+                      <div
+                        className={cn(
+                          "mt-1 flex flex-wrap gap-1",
+                          mine ? "justify-end" : "justify-start"
+                        )}
+                      >
+                        {REACTIONS.filter((e) =>
+                          msgReactions.some((r) => r.emoji === e)
+                        ).map((emoji) => {
+                          const list = msgReactions.filter((r) => r.emoji === emoji);
+                          const reactedByMe = list.some(
+                            (r) => r.member_id === member?.id
+                          );
+                          return (
+                            <button
+                              key={emoji}
+                              onClick={() => toggleReaction(m, emoji)}
+                              className={cn(
+                                "tap-shrink flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-xs",
+                                reactedByMe
+                                  ? "border-pitch-300 bg-pitch-50 text-pitch-700"
+                                  : "border-slate-200 bg-white text-slate-500"
+                              )}
+                            >
+                              <span className="text-sm">{emoji}</span>
+                              {list.length}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -338,6 +439,7 @@ export default function Chat() {
         message={actionMsg}
         mine={actionMsg?.member_id === member?.id}
         onClose={() => setActionMsg(null)}
+        onReact={(emoji) => actionMsg && toggleReaction(actionMsg, emoji)}
         onCopy={() => actionMsg && copyMessage(actionMsg)}
         onDelete={() => actionMsg && deleteMessage(actionMsg)}
         onReadInfo={() => {
@@ -360,11 +462,12 @@ export default function Chat() {
   );
 }
 
-/* ---------------- 長押しアクションメニュー ---------------- */
+/* ---------------- タップで開くアクションメニュー ---------------- */
 function ActionSheet({
   message,
   mine,
   onClose,
+  onReact,
   onCopy,
   onDelete,
   onReadInfo,
@@ -372,6 +475,7 @@ function ActionSheet({
   message: Message | null;
   mine: boolean;
   onClose: () => void;
+  onReact: (emoji: string) => void;
   onCopy: () => void;
   onDelete: () => void;
   onReadInfo: () => void;
@@ -381,6 +485,19 @@ function ActionSheet({
     <div className="fixed inset-0 z-50 flex flex-col justify-end p-3">
       <div className="animate-fade-in absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="animate-sheet-up relative pb-[var(--safe-bottom)]">
+        {/* リアクション選択 */}
+        <div className="mb-2 flex items-center justify-around rounded-[1.4rem] bg-white/95 px-2 py-2 backdrop-blur">
+          {REACTIONS.map((emoji) => (
+            <button
+              key={emoji}
+              onClick={() => onReact(emoji)}
+              className="tap-shrink flex h-12 w-12 items-center justify-center rounded-full text-2xl active:bg-slate-100"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+
         <div className="mb-2 overflow-hidden rounded-[1.1rem] bg-white/95 backdrop-blur">
           <div className="border-b border-slate-100 px-4 py-2.5">
             <p className="line-clamp-2 text-sm text-slate-500">{message.body}</p>
@@ -434,7 +551,7 @@ function ActionRow({
   );
 }
 
-/* ---------------- 既読の詳細（誰が読んだか） ---------------- */
+/* ---------------- 既読の詳細 ---------------- */
 function ReadInfoSheet({
   message,
   onClose,
