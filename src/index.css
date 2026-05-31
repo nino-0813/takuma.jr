@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pitch-50: #f0fdf4;
+  --color-pitch-100: #dcfce7;
+  --color-pitch-200: #bbf7d0;
+  --color-pitch-300: #86efac;
+  --color-pitch-400: #4ade80;
+  --color-pitch-500: #22c55e;
+  --color-pitch-600: #16a34a;
+  --color-pitch-700: #15803d;
+  --color-pitch-800: #166534;
+  --color-pitch-900: #14532d;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+
+  --radius-ios: 1.25rem;
+}
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: #f2f4f7;
+  color: #111827;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iOSっぽいスクロール慣性 */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* タップで青くハイライトされないように */
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* アクティブ時の軽い押し込みアニメ（ネイティブ感） */
+@media (hover: none) {
+  .tap-shrink:active {
+    transform: scale(0.97);
+    transition: transform 0.08s ease;
+  }
+}
+.tap-shrink {
+  transition: transform 0.12s ease;
+}
+
+/* スクロールバー非表示（モバイル風） */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.animate-sheet-up {
+  animation: sheet-up 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-fade-in {
+  animation: fade-in 0.2s ease;
+}
