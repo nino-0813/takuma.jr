@@ -12,6 +12,7 @@ create table if not exists public.teams (
   name text not null,
   emoji text,
   invite_code text not null unique,
+  admin_code text,
   created_at timestamptz not null default now()
 );
 

@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/AppShell";
-import { Avatar, Button, Card, Spinner } from "@/components/ui";
+import {
+  Avatar,
+  Button,
+  Card,
+  Field,
+  Sheet,
+  Spinner,
+  inputClass,
+} from "@/components/ui";
 import { LogoutIcon, ShareIcon, UsersIcon } from "@/components/icons";
 import ProfileSheet from "@/components/ProfileSheet";
 import MemberSheet from "@/components/MemberSheet";
@@ -16,7 +24,7 @@ import type { Member } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export default function Team() {
-  const { team, member, isAdmin, signOut } = useSession();
+  const { team, member, isAdmin, signOut, refresh } = useSession();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [showProfile, setShowProfile] = useState(false);
@@ -24,6 +32,28 @@ export default function Team() {
   const [copied, setCopied] = useState(false);
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [showAdminCode, setShowAdminCode] = useState(false);
+  const [codeInput, setCodeInput] = useState("");
+  const [codeBusy, setCodeBusy] = useState(false);
+  const [codeErr, setCodeErr] = useState("");
+
+  async function becomeAdmin() {
+    if (!team || !member) return;
+    setCodeBusy(true);
+    setCodeErr("");
+    const input = codeInput.trim().toUpperCase();
+    if (!team.admin_code || input !== team.admin_code.toUpperCase()) {
+      setCodeErr("コードが正しくありません");
+      setCodeBusy(false);
+      return;
+    }
+    await supabase.from("members").update({ role: "admin" }).eq("id", member.id);
+    await refresh();
+    await load();
+    setCodeBusy(false);
+    setShowAdminCode(false);
+    setCodeInput("");
+  }
 
   useEffect(() => {
     isPushEnabled().then(setPushOn);
@@ -158,6 +188,48 @@ export default function Team() {
           </Card>
         )}
 
+        {/* 管理者 */}
+        {isAdmin ? (
+          <Card className="p-4">
+            <p className="font-bold">👑 管理者コード</p>
+            <p className="mt-0.5 text-xs text-slate-400">
+              このコードを渡すと、その人もアプリから管理者になれます
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <code className="flex-1 rounded-xl bg-slate-100 px-4 py-2.5 text-center text-xl font-bold tracking-[0.3em]">
+                {team?.admin_code ?? "—"}
+              </code>
+              <button
+                onClick={async () => {
+                  if (team?.admin_code) {
+                    await navigator.clipboard.writeText(team.admin_code);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  }
+                }}
+                className="tap-shrink rounded-xl bg-pitch-50 px-3 py-2.5 text-sm font-semibold text-pitch-700"
+              >
+                {copied ? "コピー済" : "コピー"}
+              </button>
+            </div>
+          </Card>
+        ) : (
+          <Card
+            onClick={() => setShowAdminCode(true)}
+            className="tap-shrink flex cursor-pointer items-center gap-3 p-3.5"
+          >
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-xl">
+              👑
+            </div>
+            <div className="flex-1">
+              <p className="font-bold">管理者になる</p>
+              <p className="text-xs text-slate-400">
+                管理者コードを入力すると予定や当番を編集できます
+              </p>
+            </div>
+          </Card>
+        )}
+
         {/* メンバー一覧 */}
         <section>
           <h2 className="mb-2 ml-1 flex items-center gap-1.5 text-sm font-bold text-slate-500">
@@ -240,6 +312,35 @@ export default function Team() {
         onClose={() => setViewing(null)}
         onUpdated={load}
       />
+
+      <Sheet
+        open={showAdminCode}
+        onClose={() => setShowAdminCode(false)}
+        title="管理者になる"
+      >
+        <div className="space-y-4 pb-2">
+          <p className="px-1 text-sm text-slate-500">
+            管理者から教えてもらった「管理者コード」を入力してください。
+          </p>
+          <Field label="管理者コード">
+            <input
+              className={inputClass + " text-center text-xl font-bold tracking-[0.3em] uppercase"}
+              placeholder="______"
+              value={codeInput}
+              maxLength={6}
+              onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
+            />
+          </Field>
+          {codeErr && <p className="text-sm text-red-500">{codeErr}</p>}
+          <Button
+            className="w-full"
+            disabled={codeBusy || codeInput.trim().length < 4}
+            onClick={becomeAdmin}
+          >
+            {codeBusy ? "確認中…" : "管理者になる"}
+          </Button>
+        </div>
+      </Sheet>
     </div>
   );
 }

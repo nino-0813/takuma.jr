@@ -25,7 +25,12 @@ export default function CreateTeam() {
       const code = generateInviteCode();
       const { data: team, error: e1 } = await supabase
         .from("teams")
-        .insert({ name: teamName.trim(), emoji, invite_code: code })
+        .insert({
+          name: teamName.trim(),
+          emoji,
+          invite_code: code,
+          admin_code: generateInviteCode(),
+        })
         .select()
         .single();
       if (e1 || !team) throw e1 ?? new Error("チーム作成に失敗しました");

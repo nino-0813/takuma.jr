@@ -5,6 +5,7 @@ export interface Team {
   name: string;
   emoji: string | null;
   invite_code: string;
+  admin_code: string | null;
   created_at: string;
 }
 
