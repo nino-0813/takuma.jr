@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import {
   CalendarIcon,
+  ChatIcon,
   KeyIcon,
   MegaphoneIcon,
   UsersIcon,
@@ -10,6 +11,7 @@ import type { ReactNode } from "react";
 
 const tabs = [
   { to: "/", label: "予定", icon: CalendarIcon, end: true },
+  { to: "/chat", label: "チャット", icon: ChatIcon },
   { to: "/board", label: "お知らせ", icon: MegaphoneIcon },
   { to: "/duties", label: "当番", icon: KeyIcon },
   { to: "/team", label: "チーム", icon: UsersIcon },

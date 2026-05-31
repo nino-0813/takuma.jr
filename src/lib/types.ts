@@ -81,3 +81,11 @@ export interface CarpoolRider {
   member_id: string;
   created_at: string;
 }
+
+export interface Message {
+  id: string;
+  team_id: string;
+  member_id: string | null;
+  body: string;
+  created_at: string;
+}

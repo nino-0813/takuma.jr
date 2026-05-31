@@ -107,6 +107,19 @@ export const ShareIcon = (p: P) => (
   </svg>
 );
 
+export const ChatIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H9l-4 3.5V16H6.5A2.5 2.5 0 0 1 4 13.5Z" />
+    <path d="M8.5 9.5h7M8.5 12.5h4" />
+  </svg>
+);
+
+export const SendIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M5 12 19 5l-4 14-3.5-5.5L5 12Z" />
+  </svg>
+);
+
 export const LogoutIcon = (p: P) => (
   <svg {...base(p)}>
     <path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2" />

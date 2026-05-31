@@ -101,6 +101,19 @@ create table if not exists public.carpool_riders (
   unique (carpool_id, member_id)
 );
 
+-- ---------- チャット ----------
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references public.teams(id) on delete cascade,
+  member_id uuid references public.members(id) on delete set null,
+  body text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_messages_team on public.messages(team_id, created_at);
+
+-- リアルタイム配信（送信後すぐ全員に届く）を有効化
+alter publication supabase_realtime add table public.messages;
+
 -- ============================================================
 --  RLS（行レベルセキュリティ）
 --  ※ このアプリはログイン無し（匂い当たらない招待リンク方式）のため、
@@ -115,6 +128,7 @@ alter table public.duties          enable row level security;
 alter table public.announcements   enable row level security;
 alter table public.carpools        enable row level security;
 alter table public.carpool_riders  enable row level security;
+alter table public.messages        enable row level security;
 
 do $$
 declare
@@ -122,7 +136,7 @@ declare
 begin
   foreach t in array array[
     'teams','members','events','attendances','duties',
-    'announcements','carpools','carpool_riders'
+    'announcements','carpools','carpool_riders','messages'
   ]
   loop
     execute format('drop policy if exists "anon_all_%1$s" on public.%1$I;', t);

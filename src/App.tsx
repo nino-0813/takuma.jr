@@ -10,6 +10,7 @@ import EventDetail from "./pages/EventDetail";
 import Board from "./pages/Board";
 import Duties from "./pages/Duties";
 import Team from "./pages/Team";
+import Chat from "./pages/Chat";
 
 export default function App() {
   const { loading, team, member } = useSession();
@@ -36,6 +37,7 @@ export default function App() {
       {signedIn ? (
         <Route element={<AppShell />}>
           <Route path="/" element={<Calendar />} />
+          <Route path="/chat" element={<Chat />} />
           <Route path="/board" element={<Board />} />
           <Route path="/duties" element={<Duties />} />
           <Route path="/team" element={<Team />} />
