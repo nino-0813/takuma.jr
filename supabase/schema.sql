@@ -111,8 +111,17 @@ create table if not exists public.messages (
 );
 create index if not exists idx_messages_team on public.messages(team_id, created_at);
 
+-- ---------- チャット既読 ----------
+create table if not exists public.chat_reads (
+  team_id uuid not null references public.teams(id) on delete cascade,
+  member_id uuid not null references public.members(id) on delete cascade,
+  last_read_at timestamptz not null default now(),
+  primary key (team_id, member_id)
+);
+
 -- リアルタイム配信（送信後すぐ全員に届く）を有効化
 alter publication supabase_realtime add table public.messages;
+alter publication supabase_realtime add table public.chat_reads;
 
 -- ============================================================
 --  RLS（行レベルセキュリティ）
@@ -129,6 +138,7 @@ alter table public.announcements   enable row level security;
 alter table public.carpools        enable row level security;
 alter table public.carpool_riders  enable row level security;
 alter table public.messages        enable row level security;
+alter table public.chat_reads      enable row level security;
 
 do $$
 declare
@@ -136,7 +146,7 @@ declare
 begin
   foreach t in array array[
     'teams','members','events','attendances','duties',
-    'announcements','carpools','carpool_riders','messages'
+    'announcements','carpools','carpool_riders','messages','chat_reads'
   ]
   loop
     execute format('drop policy if exists "anon_all_%1$s" on public.%1$I;', t);

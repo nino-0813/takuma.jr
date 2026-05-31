@@ -89,3 +89,9 @@ export interface Message {
   body: string;
   created_at: string;
 }
+
+export interface ChatRead {
+  team_id: string;
+  member_id: string;
+  last_read_at: string;
+}

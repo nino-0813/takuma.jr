@@ -1,25 +1,20 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/AppShell";
-import {
-  Avatar,
-  Button,
-  Card,
-  Field,
-  Sheet,
-  Spinner,
-  inputClass,
-} from "@/components/ui";
+import { Avatar, Button, Card, Spinner } from "@/components/ui";
 import { LogoutIcon, ShareIcon, UsersIcon } from "@/components/icons";
+import ProfileSheet from "@/components/ProfileSheet";
+import MemberSheet from "@/components/MemberSheet";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session";
 import type { Member } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export default function Team() {
-  const { team, member, isAdmin, signOut, refresh } = useSession();
+  const { team, member, isAdmin, signOut } = useSession();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [showProfile, setShowProfile] = useState(false);
+  const [viewing, setViewing] = useState<Member | null>(null);
   const [copied, setCopied] = useState(false);
 
   async function load() {
@@ -88,7 +83,7 @@ export default function Team() {
           </div>
         </Card>
 
-        {/* 自分のプロフィール */}
+        {/* マイページ */}
         <Card
           onClick={() => setShowProfile(true)}
           className="tap-shrink flex cursor-pointer items-center gap-3 p-3.5"
@@ -97,7 +92,7 @@ export default function Team() {
           <div className="flex-1">
             <p className="font-bold">{member?.name}</p>
             <p className="text-xs text-slate-400">
-              {isAdmin ? "管理者" : "メンバー"}・タップで編集
+              マイページ・タップで情報を登録／編集
             </p>
           </div>
         </Card>
@@ -115,7 +110,11 @@ export default function Team() {
           ) : (
             <Card className="divide-y divide-slate-100">
               {members.map((m) => (
-                <div key={m.id} className="flex items-center gap-3 px-4 py-3">
+                <button
+                  key={m.id}
+                  onClick={() => setViewing(m)}
+                  className="tap-shrink flex w-full items-center gap-3 px-4 py-3 text-left"
+                >
                   <Avatar name={m.name} size={40} />
                   <div className="flex-1">
                     <p className="font-semibold">
@@ -132,20 +131,21 @@ export default function Team() {
                       {m.phone && `・${m.phone}`}
                     </p>
                   </div>
-                  <button
-                    onClick={() => toggleAdmin(m)}
-                    disabled={!isAdmin || m.id === member?.id}
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleAdmin(m);
+                    }}
                     className={cn(
                       "rounded-full px-2.5 py-1 text-xs font-bold",
                       m.role === "admin"
                         ? "bg-pitch-100 text-pitch-700"
-                        : "bg-slate-100 text-slate-400",
-                      isAdmin && m.id !== member?.id && "tap-shrink"
+                        : "bg-slate-100 text-slate-400"
                     )}
                   >
                     {m.role === "admin" ? "管理者" : "メンバー"}
-                  </button>
-                </div>
+                  </span>
+                </button>
               ))}
             </Card>
           )}
@@ -172,99 +172,13 @@ export default function Team() {
       <ProfileSheet
         open={showProfile}
         onClose={() => setShowProfile(false)}
-        onSaved={async () => {
-          setShowProfile(false);
-          await refresh();
-          load();
-        }}
+        onSaved={load}
+      />
+      <MemberSheet
+        member={viewing}
+        onClose={() => setViewing(null)}
+        onUpdated={load}
       />
     </div>
-  );
-}
-
-function ProfileSheet({
-  open,
-  onClose,
-  onSaved,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const { member } = useSession();
-  const [name, setName] = useState("");
-  const [childName, setChildName] = useState("");
-  const [jersey, setJersey] = useState("");
-  const [phone, setPhone] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (open && member) {
-      setName(member.name);
-      setChildName(member.child_name ?? "");
-      setJersey(member.jersey_number != null ? String(member.jersey_number) : "");
-      setPhone(member.phone ?? "");
-    }
-  }, [open, member]);
-
-  async function save() {
-    if (!member || !name.trim()) return;
-    setBusy(true);
-    await supabase
-      .from("members")
-      .update({
-        name: name.trim(),
-        child_name: childName.trim() || null,
-        jersey_number: jersey ? Number(jersey) : null,
-        phone: phone.trim() || null,
-      })
-      .eq("id", member.id);
-    setBusy(false);
-    onSaved();
-  }
-
-  return (
-    <Sheet open={open} onClose={onClose} title="プロフィール編集">
-      <div className="space-y-4 pb-2">
-        <Field label="あなたの名前">
-          <input
-            className={inputClass}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </Field>
-        <Field label="お子さんの名前（任意）">
-          <input
-            className={inputClass}
-            placeholder="例）太郎"
-            value={childName}
-            onChange={(e) => setChildName(e.target.value)}
-          />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="背番号（任意）">
-            <input
-              type="number"
-              className={inputClass}
-              placeholder="10"
-              value={jersey}
-              onChange={(e) => setJersey(e.target.value)}
-            />
-          </Field>
-          <Field label="連絡先（任意）">
-            <input
-              type="tel"
-              className={inputClass}
-              placeholder="090-..."
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-          </Field>
-        </div>
-        <Button className="w-full" disabled={busy || !name.trim()} onClick={save}>
-          {busy ? "保存中…" : "保存"}
-        </Button>
-      </div>
-    </Sheet>
   );
 }

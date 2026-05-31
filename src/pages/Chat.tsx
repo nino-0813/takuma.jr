@@ -1,20 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, isSameDay } from "date-fns";
-import { ja } from "date-fns/locale";
 import { Avatar, Spinner } from "@/components/ui";
 import { ChatIcon, SendIcon } from "@/components/icons";
+import MemberSheet from "@/components/MemberSheet";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session";
-import type { Member, Message } from "@/lib/types";
+import type { ChatRead, Member, Message } from "@/lib/types";
 import { cn, fmtDate } from "@/lib/utils";
 
 export default function Chat() {
   const { team, member } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [reads, setReads] = useState<Map<string, number>>(new Map()); // member_id -> last_read time(ms)
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [viewing, setViewing] = useState<Member | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const memberMap = useMemo(() => {
@@ -24,17 +26,25 @@ export default function Chat() {
   }, [members]);
 
   function scrollToBottom(smooth = false) {
-    bottomRef.current?.scrollIntoView({
-      behavior: smooth ? "smooth" : "auto",
-    });
+    bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
   }
+
+  // 自分の既読位置を「今」に更新
+  const markRead = useCallback(async () => {
+    if (!team || !member) return;
+    const now = new Date().toISOString();
+    await supabase.from("chat_reads").upsert(
+      { team_id: team.id, member_id: member.id, last_read_at: now },
+      { onConflict: "team_id,member_id" }
+    );
+  }, [team, member]);
 
   // 初期ロード
   useEffect(() => {
     if (!team) return;
     let active = true;
     (async () => {
-      const [{ data: msgs }, { data: ms }] = await Promise.all([
+      const [{ data: msgs }, { data: ms }, { data: rs }] = await Promise.all([
         supabase
           .from("messages")
           .select("*")
@@ -42,23 +52,30 @@ export default function Chat() {
           .order("created_at", { ascending: true })
           .limit(300),
         supabase.from("members").select("*").eq("team_id", team.id),
+        supabase.from("chat_reads").select("*").eq("team_id", team.id),
       ]);
       if (!active) return;
       setMessages((msgs as Message[]) ?? []);
       setMembers((ms as Member[]) ?? []);
+      const map = new Map<string, number>();
+      ((rs as ChatRead[]) ?? []).forEach((r) =>
+        map.set(r.member_id, new Date(r.last_read_at).getTime())
+      );
+      setReads(map);
       setLoading(false);
       setTimeout(() => scrollToBottom(), 50);
+      markRead();
     })();
     return () => {
       active = false;
     };
-  }, [team?.id]);
+  }, [team?.id, markRead]);
 
-  // リアルタイム購読（新着メッセージを即反映）
+  // リアルタイム購読（新着メッセージ＆既読）
   useEffect(() => {
     if (!team) return;
     const channel = supabase
-      .channel(`messages:${team.id}`)
+      .channel(`chat:${team.id}`)
       .on(
         "postgres_changes",
         {
@@ -72,18 +89,48 @@ export default function Chat() {
           setMessages((prev) =>
             prev.some((x) => x.id === m.id) ? prev : [...prev, m]
           );
+          if (m.member_id !== member?.id) markRead();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chat_reads",
+          filter: `team_id=eq.${team.id}`,
+        },
+        (payload) => {
+          const r = payload.new as ChatRead;
+          if (!r?.member_id) return;
+          setReads((prev) => {
+            const next = new Map(prev);
+            next.set(r.member_id, new Date(r.last_read_at).getTime());
+            return next;
+          });
         }
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [team?.id]);
+  }, [team?.id, member?.id, markRead]);
 
-  // メッセージが増えたら一番下へ
   useEffect(() => {
     scrollToBottom(true);
   }, [messages.length]);
+
+  // 自分のメッセージを読んだ人数（自分以外）
+  function readCount(msg: Message) {
+    const t = new Date(msg.created_at).getTime();
+    let n = 0;
+    members.forEach((mem) => {
+      if (mem.id === member?.id) return;
+      const r = reads.get(mem.id);
+      if (r != null && r >= t) n++;
+    });
+    return n;
+  }
 
   async function send() {
     const body = text.trim();
@@ -97,27 +144,27 @@ export default function Chat() {
       .single();
     setSending(false);
     if (error) {
-      setText(body); // 失敗時は戻す
+      setText(body);
       return;
     }
-    // リアルタイムが届かない環境でも表示されるよう、重複回避して追加
     if (data) {
       const m = data as Message;
       setMessages((prev) =>
         prev.some((x) => x.id === m.id) ? prev : [...prev, m]
       );
     }
+    markRead();
   }
+
+  const others = members.filter((m) => m.id !== member?.id).length;
 
   return (
     <div className="flex min-h-dvh flex-col">
-      {/* ヘッダー */}
       <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/85 px-5 pb-3 pt-[calc(0.9rem+var(--safe-top))] backdrop-blur-xl">
         <h1 className="text-xl font-bold">チャット</h1>
         <p className="text-xs text-slate-400">{team?.name}・みんなの連絡</p>
       </header>
 
-      {/* メッセージ一覧 */}
       <div className="flex-1 px-3 pb-[calc(8rem+var(--safe-bottom))] pt-3">
         {loading ? (
           <div className="flex justify-center py-10">
@@ -134,10 +181,13 @@ export default function Chat() {
             const prev = messages[i - 1];
             const mine = m.member_id === member?.id;
             const author = m.member_id ? memberMap.get(m.member_id) : undefined;
-            const showName =
-              !mine && (!prev || prev.member_id !== m.member_id);
+            const showName = !mine && (!prev || prev.member_id !== m.member_id);
             const newDay =
-              !prev || !isSameDay(new Date(prev.created_at), new Date(m.created_at));
+              !prev ||
+              !isSameDay(new Date(prev.created_at), new Date(m.created_at));
+            const isLastMine =
+              mine && (i === messages.length - 1 || messages[i + 1]?.member_id !== m.member_id);
+            const rc = mine ? readCount(m) : 0;
             return (
               <div key={m.id}>
                 {newDay && (
@@ -156,8 +206,13 @@ export default function Chat() {
                 >
                   {!mine && (
                     <div className="w-7 shrink-0">
-                      {showName && (
-                        <Avatar name={author?.name ?? "?"} size={28} />
+                      {showName && author && (
+                        <button
+                          onClick={() => setViewing(author)}
+                          className="tap-shrink"
+                        >
+                          <Avatar name={author.name} size={28} />
+                        </button>
                       )}
                     </div>
                   )}
@@ -168,15 +223,23 @@ export default function Chat() {
                     )}
                   >
                     {showName && (
-                      <span className="mb-0.5 ml-1 text-[11px] text-slate-400">
+                      <button
+                        onClick={() => author && setViewing(author)}
+                        className="mb-0.5 ml-1 text-[11px] text-slate-400"
+                      >
                         {author?.name ?? "退会したメンバー"}
-                      </span>
+                      </button>
                     )}
                     <div className="flex items-end gap-1.5">
                       {mine && (
-                        <span className="mb-0.5 text-[10px] text-slate-400">
-                          {format(new Date(m.created_at), "HH:mm")}
-                        </span>
+                        <div className="mb-0.5 flex flex-col items-end text-[10px] leading-tight text-slate-400">
+                          {isLastMine && rc > 0 && (
+                            <span className="font-semibold text-pitch-600">
+                              {rc >= others && others > 0 ? "既読" : `既読 ${rc}`}
+                            </span>
+                          )}
+                          <span>{format(new Date(m.created_at), "HH:mm")}</span>
+                        </div>
                       )}
                       <div
                         className={cn(
@@ -203,7 +266,6 @@ export default function Chat() {
         <div ref={bottomRef} />
       </div>
 
-      {/* 入力バー（タブバーの上に固定） */}
       <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[480px]">
         <div className="border-t border-slate-200/70 bg-white/90 px-3 pb-[calc(4.75rem+var(--safe-bottom))] pt-2.5 backdrop-blur-xl">
           <div className="flex items-end gap-2">
@@ -233,6 +295,8 @@ export default function Chat() {
           </div>
         </div>
       </div>
+
+      <MemberSheet member={viewing} onClose={() => setViewing(null)} />
     </div>
   );
 }
