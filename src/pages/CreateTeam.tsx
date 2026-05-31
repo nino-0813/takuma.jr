@@ -29,7 +29,6 @@ export default function CreateTeam() {
           name: teamName.trim(),
           emoji,
           invite_code: code,
-          admin_code: generateInviteCode(),
         })
         .select()
         .single();

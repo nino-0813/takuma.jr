@@ -21,7 +21,7 @@ import {
   pushSupported,
 } from "@/lib/push";
 import type { Member } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, generateInviteCode } from "@/lib/utils";
 
 export default function Team() {
   const { team, member, isAdmin, signOut, refresh } = useSession();
@@ -36,6 +36,20 @@ export default function Team() {
   const [codeInput, setCodeInput] = useState("");
   const [codeBusy, setCodeBusy] = useState(false);
   const [codeErr, setCodeErr] = useState("");
+
+  const [codeGenBusy, setCodeGenBusy] = useState(false);
+
+  async function generateAdminCode() {
+    if (!team || codeGenBusy) return;
+    if (team.admin_code && !confirm("コードを作り直しますか？\n以前のコードは使えなくなります。")) {
+      return;
+    }
+    setCodeGenBusy(true);
+    const newCode = generateInviteCode();
+    await supabase.from("teams").update({ admin_code: newCode }).eq("id", team.id);
+    await refresh();
+    setCodeGenBusy(false);
+  }
 
   async function becomeAdmin() {
     if (!team || !member) return;
@@ -201,23 +215,40 @@ export default function Team() {
             <p className="mt-0.5 text-xs text-slate-400">
               このコードを渡すと、その人もアプリから管理者になれます
             </p>
-            <div className="mt-2 flex items-center gap-2">
-              <code className="flex-1 rounded-xl bg-slate-100 px-4 py-2.5 text-center text-xl font-bold tracking-[0.3em]">
-                {team?.admin_code ?? "—"}
-              </code>
-              <button
-                onClick={async () => {
-                  if (team?.admin_code) {
-                    await navigator.clipboard.writeText(team.admin_code);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
-                  }
-                }}
-                className="tap-shrink rounded-xl bg-pitch-50 px-3 py-2.5 text-sm font-semibold text-pitch-700"
+            {team?.admin_code ? (
+              <>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="flex-1 rounded-xl bg-slate-100 px-4 py-2.5 text-center text-xl font-bold tracking-[0.3em]">
+                    {team.admin_code}
+                  </code>
+                  <button
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(team.admin_code!);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1500);
+                    }}
+                    className="tap-shrink rounded-xl bg-pitch-50 px-3 py-2.5 text-sm font-semibold text-pitch-700"
+                  >
+                    {copied ? "コピー済" : "コピー"}
+                  </button>
+                </div>
+                <button
+                  onClick={generateAdminCode}
+                  disabled={codeGenBusy}
+                  className="tap-shrink mt-2 text-xs font-semibold text-slate-400 disabled:opacity-50"
+                >
+                  {codeGenBusy ? "作成中…" : "コードを作り直す"}
+                </button>
+              </>
+            ) : (
+              <Button
+                className="mt-3 w-full"
+                disabled={codeGenBusy}
+                onClick={generateAdminCode}
               >
-                {copied ? "コピー済" : "コピー"}
-              </button>
-            </div>
+                {codeGenBusy ? "作成中…" : "管理者コードを作成"}
+              </Button>
+            )}
           </Card>
         ) : (
           <Card

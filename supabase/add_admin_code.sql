@@ -3,9 +3,5 @@
 --  Supabase → SQL Editor に貼り付けて Run
 -- ============================================================
 
+-- 列を追加するだけ。コードはアプリの「管理者コードを作成」ボタンで作ります。
 alter table public.teams add column if not exists admin_code text;
-
--- 既存チームにランダムな管理者コードを割り当て（未設定のものだけ）
-update public.teams
-set admin_code = upper(substr(md5(random()::text), 1, 6))
-where admin_code is null;
