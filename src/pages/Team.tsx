@@ -158,23 +158,25 @@ export default function Team() {
         </Card>
 
         {/* 通知 */}
-        {pushSupported() && (
-          <Card className="flex items-center gap-3 p-3.5">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-xl">
-              🔔
-            </div>
-            <div className="flex-1">
-              <p className="font-bold">プッシュ通知</p>
-              <p className="text-xs text-slate-400">
-                新着連絡・試合リマインドをこの端末で受け取る
-              </p>
-            </div>
+        <Card className="flex items-center gap-3 p-3.5">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-xl">
+            🔔
+          </div>
+          <div className="flex-1">
+            <p className="font-bold">プッシュ通知</p>
+            <p className="text-xs text-slate-400">
+              {pushSupported()
+                ? "新着連絡・試合リマインドをこの端末で受け取る"
+                : "iPhoneは「共有 → ホーム画面に追加」して、追加したアイコンから開くと使えます"}
+            </p>
+          </div>
+          {pushSupported() ? (
             <button
               onClick={togglePush}
               disabled={pushBusy}
               aria-label="通知の切り替え"
               className={cn(
-                "h-7 w-12 rounded-full p-0.5 transition-colors disabled:opacity-50",
+                "h-7 w-12 shrink-0 rounded-full p-0.5 transition-colors disabled:opacity-50",
                 pushOn ? "bg-pitch-500" : "bg-slate-300"
               )}
             >
@@ -185,8 +187,12 @@ export default function Team() {
                 )}
               />
             </button>
-          </Card>
-        )}
+          ) : (
+            <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-400">
+              未対応
+            </span>
+          )}
+        </Card>
 
         {/* 管理者 */}
         {isAdmin ? (
