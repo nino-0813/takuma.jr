@@ -11,6 +11,7 @@ import Board from "./pages/Board";
 import Duties from "./pages/Duties";
 import Team from "./pages/Team";
 import Chat from "./pages/Chat";
+import { UnreadProvider } from "./lib/unread";
 
 export default function App() {
   const { loading, team, member } = useSession();
@@ -35,7 +36,13 @@ export default function App() {
 
       {/* 認証必須 */}
       {signedIn ? (
-        <Route element={<AppShell />}>
+        <Route
+          element={
+            <UnreadProvider>
+              <AppShell />
+            </UnreadProvider>
+          }
+        >
           <Route path="/" element={<Calendar />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/board" element={<Board />} />

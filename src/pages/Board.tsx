@@ -16,6 +16,7 @@ import {
 import { MegaphoneIcon, PinIcon, PlusIcon, TrashIcon } from "@/components/icons";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session";
+import { sendPush } from "@/lib/push";
 import type { Announcement, Member } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -172,6 +173,13 @@ function AddAnnouncementSheet({
       title: title.trim(),
       body: body.trim(),
       pinned,
+    });
+    sendPush({
+      teamId: team.id,
+      title: `📢 ${title.trim()}`,
+      body: body.trim(),
+      url: "/board",
+      excludeMemberId: member?.id,
     });
     setBusy(false);
     setTitle("");

@@ -131,6 +131,18 @@ create table if not exists public.message_reactions (
 );
 create index if not exists idx_reactions_message on public.message_reactions(message_id);
 
+-- ---------- プッシュ通知の購読 ----------
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references public.teams(id) on delete cascade,
+  member_id uuid not null references public.members(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_push_team on public.push_subscriptions(team_id);
+
 -- リアルタイム配信（送信後すぐ全員に届く）を有効化
 alter publication supabase_realtime add table public.messages;
 alter publication supabase_realtime add table public.chat_reads;
@@ -153,6 +165,7 @@ alter table public.carpool_riders  enable row level security;
 alter table public.messages          enable row level security;
 alter table public.chat_reads        enable row level security;
 alter table public.message_reactions enable row level security;
+alter table public.push_subscriptions enable row level security;
 
 do $$
 declare
@@ -161,7 +174,7 @@ begin
   foreach t in array array[
     'teams','members','events','attendances','duties',
     'announcements','carpools','carpool_riders','messages','chat_reads',
-    'message_reactions'
+    'message_reactions','push_subscriptions'
   ]
   loop
     execute format('drop policy if exists "anon_all_%1$s" on public.%1$I;', t);

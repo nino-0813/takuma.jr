@@ -6,6 +6,12 @@ import ProfileSheet from "@/components/ProfileSheet";
 import MemberSheet from "@/components/MemberSheet";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session";
+import {
+  disablePush,
+  enablePush,
+  isPushEnabled,
+  pushSupported,
+} from "@/lib/push";
 import type { Member } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +22,30 @@ export default function Team() {
   const [showProfile, setShowProfile] = useState(false);
   const [viewing, setViewing] = useState<Member | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pushOn, setPushOn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+
+  useEffect(() => {
+    isPushEnabled().then(setPushOn);
+  }, []);
+
+  async function togglePush() {
+    if (!team || !member || pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (pushOn) {
+        await disablePush();
+        setPushOn(false);
+      } else {
+        await enablePush(team.id, member.id);
+        setPushOn(true);
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "通知の設定に失敗しました");
+    } finally {
+      setPushBusy(false);
+    }
+  }
 
   async function load() {
     if (!team) return;
@@ -96,6 +126,37 @@ export default function Team() {
             </p>
           </div>
         </Card>
+
+        {/* 通知 */}
+        {pushSupported() && (
+          <Card className="flex items-center gap-3 p-3.5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-xl">
+              🔔
+            </div>
+            <div className="flex-1">
+              <p className="font-bold">プッシュ通知</p>
+              <p className="text-xs text-slate-400">
+                新着連絡・試合リマインドをこの端末で受け取る
+              </p>
+            </div>
+            <button
+              onClick={togglePush}
+              disabled={pushBusy}
+              aria-label="通知の切り替え"
+              className={cn(
+                "h-7 w-12 rounded-full p-0.5 transition-colors disabled:opacity-50",
+                pushOn ? "bg-pitch-500" : "bg-slate-300"
+              )}
+            >
+              <span
+                className={cn(
+                  "block h-6 w-6 rounded-full bg-white shadow transition-transform",
+                  pushOn && "translate-x-5"
+                )}
+              />
+            </button>
+          </Card>
+        )}
 
         {/* メンバー一覧 */}
         <section>

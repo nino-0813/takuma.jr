@@ -9,7 +9,13 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       registerType: "autoUpdate",
+      injectManifest: {
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
+      },
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "チームつながる",
@@ -37,16 +43,6 @@ export default defineConfig({
             sizes: "512x512",
             type: "image/png",
             purpose: "maskable",
-          },
-        ],
-      },
-      workbox: {
-        navigateFallbackDenylist: [/^\/api/],
-        runtimeCaching: [
-          {
-            urlPattern: ({ url }) => url.pathname.startsWith("/"),
-            handler: "NetworkFirst",
-            options: { cacheName: "app-shell" },
           },
         ],
       },

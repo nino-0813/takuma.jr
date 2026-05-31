@@ -7,17 +7,19 @@ import {
   UsersIcon,
 } from "./icons";
 import { cn } from "@/lib/utils";
+import { useUnread } from "@/lib/unread";
 import type { ReactNode } from "react";
 
 const tabs = [
   { to: "/", label: "予定", icon: CalendarIcon, end: true },
-  { to: "/chat", label: "チャット", icon: ChatIcon },
+  { to: "/chat", label: "チャット", icon: ChatIcon, badge: true },
   { to: "/board", label: "お知らせ", icon: MegaphoneIcon },
   { to: "/duties", label: "当番", icon: KeyIcon },
   { to: "/team", label: "チーム", icon: UsersIcon },
 ];
 
 export default function AppShell() {
+  const { count } = useUnread();
   return (
     <div className="mx-auto flex min-h-dvh max-w-[480px] flex-col bg-[#f2f4f7]">
       <main className="flex-1 pb-[calc(4.75rem+var(--safe-bottom))]">
@@ -39,11 +41,18 @@ export default function AppShell() {
             >
               {({ isActive }) => (
                 <>
-                  <t.icon
-                    width={26}
-                    height={26}
-                    strokeWidth={isActive ? 2.2 : 1.9}
-                  />
+                  <span className="relative">
+                    <t.icon
+                      width={26}
+                      height={26}
+                      strokeWidth={isActive ? 2.2 : 1.9}
+                    />
+                    {t.badge && count > 0 && (
+                      <span className="absolute -right-2.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+                        {count > 99 ? "99+" : count}
+                      </span>
+                    )}
+                  </span>
                   {t.label}
                 </>
               )}

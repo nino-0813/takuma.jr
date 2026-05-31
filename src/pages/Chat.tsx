@@ -5,6 +5,8 @@ import { ChatIcon, SendIcon, TrashIcon } from "@/components/icons";
 import MemberSheet from "@/components/MemberSheet";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session";
+import { useUnread } from "@/lib/unread";
+import { sendPush } from "@/lib/push";
 import type { ChatRead, Member, Message, MessageReaction } from "@/lib/types";
 import { cn, fmtDate } from "@/lib/utils";
 
@@ -12,6 +14,7 @@ const REACTIONS = ["👍", "❤️", "⚽️", "😂", "🙏", "✅"];
 
 export default function Chat() {
   const { team, member } = useSession();
+  const { clear } = useUnread();
   const [messages, setMessages] = useState<Message[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [reads, setReads] = useState<Map<string, number>>(new Map());
@@ -161,7 +164,8 @@ export default function Chat() {
 
   useEffect(() => {
     scrollToBottom(true);
-  }, [messages.length]);
+    clear(); // チャットを見ている間は未読バッジを消す
+  }, [messages.length, clear]);
 
   function splitReaders(msg: Message) {
     const t = new Date(msg.created_at).getTime();
@@ -197,6 +201,13 @@ export default function Chat() {
         prev.some((x) => x.id === m.id) ? prev : [...prev, m]
       );
     }
+    sendPush({
+      teamId: team.id,
+      title: `💬 ${member.name}`,
+      body,
+      url: "/chat",
+      excludeMemberId: member.id,
+    });
     markRead();
   }
 
