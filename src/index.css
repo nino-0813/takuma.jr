@@ -63,6 +63,13 @@ a {
   transition: transform 0.12s ease;
 }
 
+/* 長押し時にiOSの文字選択・コールアウトを出さない */
+.no-callout {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 /* スクロールバー非表示（モバイル風） */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, isSameDay } from "date-fns";
 import { Avatar, Spinner } from "@/components/ui";
-import { ChatIcon, SendIcon } from "@/components/icons";
+import { ChatIcon, SendIcon, TrashIcon } from "@/components/icons";
 import MemberSheet from "@/components/MemberSheet";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session";
@@ -17,7 +17,10 @@ export default function Chat() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [viewing, setViewing] = useState<Member | null>(null);
+  const [actionMsg, setActionMsg] = useState<Message | null>(null);
+  const [readInfoMsg, setReadInfoMsg] = useState<Message | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const pressTimer = useRef<number | undefined>(undefined);
 
   const memberMap = useMemo(() => {
     const m = new Map<string, Member>();
@@ -29,7 +32,6 @@ export default function Chat() {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
   }
 
-  // 自分の既読位置を「今」に更新
   const markRead = useCallback(async () => {
     if (!team || !member) return;
     const now = new Date().toISOString();
@@ -71,19 +73,14 @@ export default function Chat() {
     };
   }, [team?.id, markRead]);
 
-  // リアルタイム購読（新着メッセージ＆既読）
+  // リアルタイム購読（新着・既読・削除）
   useEffect(() => {
     if (!team) return;
     const channel = supabase
       .channel(`chat:${team.id}`)
       .on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `team_id=eq.${team.id}`,
-        },
+        { event: "INSERT", schema: "public", table: "messages", filter: `team_id=eq.${team.id}` },
         (payload) => {
           const m = payload.new as Message;
           setMessages((prev) =>
@@ -94,12 +91,15 @@ export default function Chat() {
       )
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "chat_reads",
-          filter: `team_id=eq.${team.id}`,
-        },
+        { event: "DELETE", schema: "public", table: "messages" },
+        (payload) => {
+          const id = (payload.old as { id?: string })?.id;
+          if (id) setMessages((prev) => prev.filter((x) => x.id !== id));
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chat_reads", filter: `team_id=eq.${team.id}` },
         (payload) => {
           const r = payload.new as ChatRead;
           if (!r?.member_id) return;
@@ -120,16 +120,18 @@ export default function Chat() {
     scrollToBottom(true);
   }, [messages.length]);
 
-  // 自分のメッセージを読んだ人数（自分以外）
-  function readCount(msg: Message) {
+  // あるメッセージを読んだ/未読のメンバー（投稿者は除く）
+  function splitReaders(msg: Message) {
     const t = new Date(msg.created_at).getTime();
-    let n = 0;
+    const read: Member[] = [];
+    const unread: Member[] = [];
     members.forEach((mem) => {
-      if (mem.id === member?.id) return;
+      if (mem.id === msg.member_id) return;
       const r = reads.get(mem.id);
-      if (r != null && r >= t) n++;
+      if (r != null && r >= t) read.push(mem);
+      else unread.push(mem);
     });
-    return n;
+    return { read, unread };
   }
 
   async function send() {
@@ -154,6 +156,36 @@ export default function Chat() {
       );
     }
     markRead();
+  }
+
+  async function deleteMessage(m: Message) {
+    setActionMsg(null);
+    setMessages((prev) => prev.filter((x) => x.id !== m.id)); // 楽観的
+    await supabase.from("messages").delete().eq("id", m.id);
+  }
+
+  async function copyMessage(m: Message) {
+    setActionMsg(null);
+    try {
+      await navigator.clipboard.writeText(m.body);
+    } catch {
+      /* 失敗時は無視 */
+    }
+  }
+
+  // 長押し（モバイル）／右クリック（PC）でアクションを開く
+  function pressProps(m: Message) {
+    return {
+      onTouchStart: () => {
+        pressTimer.current = window.setTimeout(() => setActionMsg(m), 420);
+      },
+      onTouchEnd: () => clearTimeout(pressTimer.current),
+      onTouchMove: () => clearTimeout(pressTimer.current),
+      onContextMenu: (e: React.MouseEvent) => {
+        e.preventDefault();
+        setActionMsg(m);
+      },
+    };
   }
 
   const others = members.filter((m) => m.id !== member?.id).length;
@@ -186,8 +218,10 @@ export default function Chat() {
               !prev ||
               !isSameDay(new Date(prev.created_at), new Date(m.created_at));
             const isLastMine =
-              mine && (i === messages.length - 1 || messages[i + 1]?.member_id !== m.member_id);
-            const rc = mine ? readCount(m) : 0;
+              mine &&
+              (i === messages.length - 1 ||
+                messages[i + 1]?.member_id !== m.member_id);
+            const rc = mine ? splitReaders(m).read.length : 0;
             return (
               <div key={m.id}>
                 {newDay && (
@@ -207,10 +241,7 @@ export default function Chat() {
                   {!mine && (
                     <div className="w-7 shrink-0">
                       {showName && author && (
-                        <button
-                          onClick={() => setViewing(author)}
-                          className="tap-shrink"
-                        >
+                        <button onClick={() => setViewing(author)} className="tap-shrink">
                           <Avatar name={author.name} size={28} />
                         </button>
                       )}
@@ -234,16 +265,20 @@ export default function Chat() {
                       {mine && (
                         <div className="mb-0.5 flex flex-col items-end text-[10px] leading-tight text-slate-400">
                           {isLastMine && rc > 0 && (
-                            <span className="font-semibold text-pitch-600">
-                              {rc >= others && others > 0 ? "既読" : `既読 ${rc}`}
-                            </span>
+                            <button
+                              onClick={() => setReadInfoMsg(m)}
+                              className="font-semibold text-pitch-600"
+                            >
+                              {rc >= others && others > 0 ? `既読 全${rc}` : `既読 ${rc}`}
+                            </button>
                           )}
                           <span>{format(new Date(m.created_at), "HH:mm")}</span>
                         </div>
                       )}
                       <div
+                        {...pressProps(m)}
                         className={cn(
-                          "whitespace-pre-wrap break-words rounded-[1.15rem] px-3.5 py-2 text-[15px] leading-relaxed",
+                          "no-callout cursor-pointer whitespace-pre-wrap break-words rounded-[1.15rem] px-3.5 py-2 text-[15px] leading-relaxed",
                           mine
                             ? "rounded-br-md bg-pitch-600 text-white"
                             : "rounded-bl-md bg-white text-slate-800 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
@@ -266,6 +301,7 @@ export default function Chat() {
         <div ref={bottomRef} />
       </div>
 
+      {/* 入力バー */}
       <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[480px]">
         <div className="border-t border-slate-200/70 bg-white/90 px-3 pb-[calc(4.75rem+var(--safe-bottom))] pt-2.5 backdrop-blur-xl">
           <div className="flex items-end gap-2">
@@ -297,6 +333,185 @@ export default function Chat() {
       </div>
 
       <MemberSheet member={viewing} onClose={() => setViewing(null)} />
+
+      <ActionSheet
+        message={actionMsg}
+        mine={actionMsg?.member_id === member?.id}
+        onClose={() => setActionMsg(null)}
+        onCopy={() => actionMsg && copyMessage(actionMsg)}
+        onDelete={() => actionMsg && deleteMessage(actionMsg)}
+        onReadInfo={() => {
+          const m = actionMsg;
+          setActionMsg(null);
+          setReadInfoMsg(m);
+        }}
+      />
+
+      <ReadInfoSheet
+        message={readInfoMsg}
+        onClose={() => setReadInfoMsg(null)}
+        split={readInfoMsg ? splitReaders(readInfoMsg) : { read: [], unread: [] }}
+        onTapMember={(mem) => {
+          setReadInfoMsg(null);
+          setViewing(mem);
+        }}
+      />
+    </div>
+  );
+}
+
+/* ---------------- 長押しアクションメニュー ---------------- */
+function ActionSheet({
+  message,
+  mine,
+  onClose,
+  onCopy,
+  onDelete,
+  onReadInfo,
+}: {
+  message: Message | null;
+  mine: boolean;
+  onClose: () => void;
+  onCopy: () => void;
+  onDelete: () => void;
+  onReadInfo: () => void;
+}) {
+  if (!message) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end p-3">
+      <div className="animate-fade-in absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="animate-sheet-up relative pb-[var(--safe-bottom)]">
+        <div className="mb-2 overflow-hidden rounded-[1.1rem] bg-white/95 backdrop-blur">
+          <div className="border-b border-slate-100 px-4 py-2.5">
+            <p className="line-clamp-2 text-sm text-slate-500">{message.body}</p>
+          </div>
+          <ActionRow label="コピー" onClick={onCopy} />
+          {mine && <ActionRow label="既読を確認" onClick={onReadInfo} />}
+          {mine && (
+            <ActionRow
+              label="削除"
+              danger
+              icon={<TrashIcon width={18} height={18} />}
+              onClick={() => {
+                if (confirm("このメッセージを削除しますか？")) onDelete();
+              }}
+            />
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="tap-shrink w-full rounded-[1.1rem] bg-white py-3.5 text-[17px] font-bold text-pitch-600"
+        >
+          キャンセル
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ActionRow({
+  label,
+  onClick,
+  danger,
+  icon,
+}: {
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center justify-center gap-1.5 border-b border-slate-100 py-3.5 text-[17px] last:border-0 active:bg-slate-100",
+        danger ? "font-semibold text-red-500" : "text-slate-800"
+      )}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+/* ---------------- 既読の詳細（誰が読んだか） ---------------- */
+function ReadInfoSheet({
+  message,
+  onClose,
+  split,
+  onTapMember,
+}: {
+  message: Message | null;
+  onClose: () => void;
+  split: { read: Member[]; unread: Member[] };
+  onTapMember: (m: Member) => void;
+}) {
+  if (!message) return null;
+  const { read, unread } = split;
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+      <div className="animate-fade-in absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="animate-sheet-up relative max-h-[80vh] overflow-y-auto rounded-t-[1.75rem] bg-[#f2f4f7] pb-[max(1.25rem,var(--safe-bottom))]">
+        <div className="sticky top-0 flex justify-center bg-[#f2f4f7]/90 pt-3 backdrop-blur">
+          <div className="h-1.5 w-10 rounded-full bg-slate-300" />
+        </div>
+        <div className="flex items-center justify-between px-5 pb-2 pt-2">
+          <h2 className="text-xl font-bold">
+            既読 {read.length}
+            <span className="ml-1 text-sm font-normal text-slate-400">
+              / {read.length + unread.length}人
+            </span>
+          </h2>
+          <button
+            onClick={onClose}
+            className="tap-shrink rounded-full bg-slate-200 px-3 py-1 text-sm font-semibold text-slate-600"
+          >
+            閉じる
+          </button>
+        </div>
+
+        <div className="px-4 pb-2">
+          {read.length > 0 && (
+            <Section title={`既読（${read.length}）`} members={read} onTap={onTapMember} />
+          )}
+          {unread.length > 0 && (
+            <Section title={`未読（${unread.length}）`} members={unread} onTap={onTapMember} dim />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Section({
+  title,
+  members,
+  onTap,
+  dim,
+}: {
+  title: string;
+  members: Member[];
+  onTap: (m: Member) => void;
+  dim?: boolean;
+}) {
+  return (
+    <div className="mb-3">
+      <p className="mb-1.5 ml-1 text-xs font-bold text-slate-400">{title}</p>
+      <div className="overflow-hidden rounded-2xl bg-white">
+        {members.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => onTap(m)}
+            className={cn(
+              "flex w-full items-center gap-3 border-b border-slate-100 px-4 py-2.5 text-left last:border-0 active:bg-slate-50",
+              dim && "opacity-60"
+            )}
+          >
+            <Avatar name={m.name} size={32} />
+            <span className="font-semibold">{m.name}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
