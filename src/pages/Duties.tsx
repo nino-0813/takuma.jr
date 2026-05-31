@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   EmptyState,
+  Fab,
   Field,
   Sheet,
   Spinner,
@@ -60,20 +61,8 @@ export default function Duties() {
 
   return (
     <div>
-      <PageHeader
-        title="鍵当番"
-        subtitle="グランドの鍵の担当表"
-        right={
-          isAdmin ? (
-            <button
-              onClick={() => setShowAdd(true)}
-              className="tap-shrink flex h-10 w-10 items-center justify-center rounded-full bg-pitch-600 text-white shadow-sm"
-            >
-              <PlusIcon />
-            </button>
-          ) : undefined
-        }
-      />
+      <PageHeader title="鍵当番" subtitle="グランドの鍵の担当表" />
+      {isAdmin && <Fab label="当番を追加" onClick={() => setShowAdd(true)} />}
 
       <div className="space-y-4 px-4">
         {myNext && (

@@ -4,6 +4,32 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/utils";
+import { PlusIcon } from "./icons";
+
+/* ---------------- Floating Action Button（右下の＋） ----------------
+   画面上部のノッチ/ステータスバーに隠れないよう、タブバーの上に固定表示 */
+export function Fab({
+  onClick,
+  label,
+}: {
+  onClick: () => void;
+  label?: string;
+}) {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[480px]">
+      <div className="flex justify-end px-4 pb-[calc(4.75rem+var(--safe-bottom)+0.85rem)]">
+        <button
+          onClick={onClick}
+          aria-label={label ?? "追加"}
+          className="tap-shrink pointer-events-auto flex h-14 items-center justify-center gap-1.5 rounded-full bg-pitch-600 px-5 font-bold text-white shadow-lg shadow-pitch-700/30"
+        >
+          <PlusIcon width={24} height={24} />
+          {label && <span className="pr-1 text-[15px]">{label}</span>}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /* ---------------- Button ---------------- */
 type Variant = "primary" | "secondary" | "ghost" | "danger";

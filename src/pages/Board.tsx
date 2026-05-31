@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   EmptyState,
+  Fab,
   Field,
   Sheet,
   Spinner,
@@ -65,18 +66,8 @@ export default function Board() {
 
   return (
     <div>
-      <PageHeader
-        title="お知らせ"
-        subtitle="大事な連絡はここに"
-        right={
-          <button
-            onClick={() => setShowAdd(true)}
-            className="tap-shrink flex h-10 w-10 items-center justify-center rounded-full bg-pitch-600 text-white shadow-sm"
-          >
-            <PlusIcon />
-          </button>
-        }
-      />
+      <PageHeader title="お知らせ" subtitle="大事な連絡はここに" />
+      <Fab label="お知らせを投稿" onClick={() => setShowAdd(true)} />
 
       <div className="space-y-3 px-4">
         {loading ? (

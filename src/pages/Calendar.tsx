@@ -17,6 +17,7 @@ import {
   Button,
   Card,
   EmptyState,
+  Fab,
   Field,
   Segmented,
   Sheet,
@@ -95,20 +96,8 @@ export default function Calendar() {
 
   return (
     <div>
-      <PageHeader
-        title="予定"
-        subtitle={team?.name}
-        right={
-          isAdmin ? (
-            <button
-              onClick={() => setShowAdd(true)}
-              className="tap-shrink flex h-10 w-10 items-center justify-center rounded-full bg-pitch-600 text-white shadow-sm"
-            >
-              <PlusIcon />
-            </button>
-          ) : undefined
-        }
-      />
+      <PageHeader title="予定" subtitle={team?.name} />
+      {isAdmin && <Fab label="予定を追加" onClick={() => setShowAdd(true)} />}
 
       {/* カレンダー */}
       <div className="px-4">
