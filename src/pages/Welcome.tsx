@@ -12,7 +12,7 @@ export default function Welcome() {
         <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-[1.5rem] bg-pitch-600 text-4xl shadow-lg">
           ⚽️
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">チームつながる</h1>
+        <h1 className="text-3xl font-bold tracking-tight">TAKUMA.jr</h1>
         <p className="mt-2 leading-relaxed text-slate-500">
           試合の参加表明・鍵当番・予定を
           <br />

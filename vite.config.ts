@@ -18,9 +18,9 @@ export default defineConfig({
       },
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
-        name: "チームつながる",
-        short_name: "つながる",
-        description: "サッカーチームの保護者連絡アプリ",
+        name: "TAKUMA.jr",
+        short_name: "TAKUMA.jr",
+        description: "TAKUMA.jr サッカーチームの保護者連絡アプリ",
         theme_color: "#16a34a",
         background_color: "#f8fafc",
         display: "standalone",
