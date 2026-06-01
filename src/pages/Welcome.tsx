@@ -36,13 +36,17 @@ export default function Welcome() {
           placeholder="ABC123"
           value={code}
           maxLength={6}
-          onChange={(e) => setCode(e.target.value.toUpperCase().trim())}
+          autoCapitalize="characters"
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(e) => setCode(e.target.value.replace(/\s/g, ""))}
         />
         <Button
           variant="secondary"
           className="w-full"
-          disabled={code.length < 4}
-          onClick={() => nav(`/join/${code}`)}
+          disabled={code.trim().length < 4}
+          onClick={() => nav(`/join/${code.trim().toUpperCase()}`)}
         >
           参加する
         </Button>

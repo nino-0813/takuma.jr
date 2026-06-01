@@ -365,7 +365,11 @@ export default function Team() {
               placeholder="______"
               value={codeInput}
               maxLength={6}
-              onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
+              autoCapitalize="characters"
+              autoCorrect="off"
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(e) => setCodeInput(e.target.value.replace(/\s/g, ""))}
             />
           </Field>
           {codeErr && <p className="text-sm text-red-500">{codeErr}</p>}
